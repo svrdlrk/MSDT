@@ -1,15 +1,28 @@
 import os
 import json
 import datetime
+import logging
 
 import tkinter as tk
 from tkinter import messagebox, simpledialog
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("task_manager.log"),
+        logging.StreamHandler()
+    ]
+)
 
 
 class TaskManager:
     def __init__(self, root):
         self.root = root
         self.root.title("Менеджер задач")
+
+        logging.info("Инициализация TaskManager")
 
         # Инициализация данных
         self.task_list = []
@@ -89,12 +102,14 @@ class TaskManager:
 
         if task_description == "":
             messagebox.showwarning("Внимание", "Пожалуйста, введите описание задачи.")
+            logging.warning("Попытка добавить задачу без описания")
             return
 
         try:
             due_date_obj = datetime.datetime.strptime(due_date, "%Y-%m-%d")
         except ValueError:
             messagebox.showwarning("Ошибка", "Неверный формат даты. Используйте формат ГГГГ-ММ-ДД.")
+            logging.error(f"Неверный формат даты: {due_date}")
             return
 
         task = {
@@ -105,6 +120,7 @@ class TaskManager:
         }
 
         self.task_list.append(task)
+        logging.info(f"Добавлена задача: {task}")
         self.update_task_list()
         self.clear_inputs()
         self.save_tasks()
@@ -121,8 +137,9 @@ class TaskManager:
             self.priority_var.set(self.current_task['priority'])
             self.due_date_entry.delete(0, tk.END)
             self.due_date_entry.insert(tk.END, self.current_task['due_date'].strftime("%Y-%m-%d"))
+            logging.info(f"Выбрана задача: {self.current_task}")
         except IndexError:
-            pass
+            logging.warning("Попытка выбрать задачу из пустого списка")
 
     def update_task(self):
         """
@@ -135,17 +152,21 @@ class TaskManager:
 
             if task_description == "":
                 messagebox.showwarning("Внимание", "Пожалуйста, введите описание задачи.")
+                logging.warning("Попытка обновить задачу без описания")
                 return
 
             try:
                 due_date_obj = datetime.datetime.strptime(due_date, "%Y-%m-%d")
             except ValueError:
                 messagebox.showwarning("Ошибка", "Неверный формат даты. Используйте формат ГГГГ-ММ-ДД.")
+                logging.error(f"Неверный формат даты при обновлении: {due_date}")
                 return
 
             self.current_task['description'] = task_description
             self.current_task['priority'] = priority
             self.current_task['due_date'] = due_date_obj
+            logging.info(f"Обновлена задача: {self.current_task}")
+
             self.update_task_list()
             self.save_tasks()
 
@@ -155,6 +176,7 @@ class TaskManager:
         """
         if self.current_task is not None:
             self.task_list.remove(self.current_task)
+            logging.info(f"Удалена задача: {self.current_task}")
             self.update_task_list()
             self.clear_inputs()
             self.save_tasks()
@@ -165,6 +187,7 @@ class TaskManager:
         """
         if self.current_task is not None:
             self.current_task['completed'] = True
+            logging.info(f"Задача отмечена как выполненная: {self.current_task}")
             self.update_task_list()
             self.save_tasks()
 
@@ -173,6 +196,7 @@ class TaskManager:
         Сортировать задачи по дате выполнения.
         """
         self.task_list.sort(key=lambda x: x['due_date'])
+        logging.info("Задачи отсортированы по дате")
         self.update_task_list()
 
     def export_to_csv(self):
@@ -185,8 +209,10 @@ class TaskManager:
                 for task in self.task_list:
                     f.write(
                         f"{task['description']},{task['priority']},{task['due_date'].strftime('%Y-%m-%d')},{task['completed']}\n")
+            logging.info("Задачи успешно экспортированы в CSV")
             messagebox.showinfo("Успех", "Задачи успешно экспортированы в tasks.csv.")
         except Exception as e:
+            logging.error(f"Ошибка при экспорте данных: {str(e)}")
             messagebox.showerror("Ошибка", f"Ошибка при экспорте данных: {str(e)}")
 
     def import_from_csv(self):
@@ -208,8 +234,10 @@ class TaskManager:
                     }
                     self.task_list.append(task)
             self.update_task_list()
+            logging.info("Задачи успешно импортированы из CSV")
             messagebox.showinfo("Успех", "Задачи успешно импортированы из tasks.csv.")
         except Exception as e:
+            logging.error(f"Ошибка при импорте данных: {str(e)}")
             messagebox.showerror("Ошибка", f"Ошибка при импорте данных: {str(e)}")
 
     def clear_all_tasks(self):
@@ -218,6 +246,7 @@ class TaskManager:
         """
         answer = messagebox.askyesno("Очистка", "Вы уверены, что хотите удалить все задачи?")
         if answer:
+            logging.info("Все задачи удалены")
             self.task_list.clear()
             self.update_task_list()
             self.save_tasks()
@@ -251,7 +280,9 @@ class TaskManager:
         try:
             with open("tasks.json", "w") as f:
                 json.dump(self.task_list, f, default=str, indent=4)
+            logging.info("Задачи успешно сохранены в JSON")
         except Exception as e:
+            logging.error(f"Не удалось сохранить задачи: {str(e)}")
             messagebox.showerror("Ошибка", f"Не удалось сохранить задачи: {str(e)}")
 
     def load_tasks(self):
@@ -264,8 +295,10 @@ class TaskManager:
                     self.task_list = json.load(f)
                     for task in self.task_list:
                         task['due_date'] = datetime.datetime.strptime(task['due_date'], "%Y-%m-%d")
+                logging.info("Задачи успешно загружены из JSON")
                 self.update_task_list()
             except Exception as e:
+                logging.error(f"Не удалось загрузить задачи: {str(e)}")
                 messagebox.showerror("Ошибка", f"Не удалось загрузить задачи: {str(e)}")
 
     def filter_tasks(self, *args):
@@ -291,4 +324,5 @@ class TaskManager:
 if __name__ == "__main__":
     root = tk.Tk()
     app = TaskManager(root)
+    logging.info("Приложение TaskManager запущено")
     root.mainloop()
